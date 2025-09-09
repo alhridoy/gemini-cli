@@ -126,8 +126,10 @@ describe('editCorrector', () => {
       );
     });
     it('should correctly process strings with some targeted escapes', () => {
+      // This test was previously demonstrating the bug - it expected \\name to become \[newline]ame
+      // The correct behavior is to NOT corrupt file paths
       expect(unescapeStringForGeminiBug('C:\\Users\\name')).toBe(
-        'C:\\Users\name',
+        'C:\\Users\\name', // Should remain unchanged - this is a file path, not an escape sequence
       );
     });
     it('should handle complex cases with mixed slashes and characters', () => {
@@ -137,9 +139,11 @@ describe('editCorrector', () => {
     });
     it('should handle escaped backslashes', () => {
       expect(unescapeStringForGeminiBug('\\\\')).toBe('\\');
-      expect(unescapeStringForGeminiBug('C:\\\\Users')).toBe('C:\\Users');
+      // These file path tests were demonstrating the bug - they expected corruption
+      // The correct behavior is to NOT corrupt file paths
+      expect(unescapeStringForGeminiBug('C:\\\\Users')).toBe('C:\\\\Users'); // Should remain unchanged
       expect(unescapeStringForGeminiBug('path\\\\to\\\\file')).toBe(
-        'path\to\\file',
+        'path\\\\to\\\\file', // Should remain unchanged
       );
     });
     it('should handle escaped backslashes mixed with other escapes (aggressive unescaping)', () => {
@@ -149,6 +153,36 @@ describe('editCorrector', () => {
       expect(unescapeStringForGeminiBug('quote\\\\"text\\\\nline')).toBe(
         'quote"text\nline',
       );
+    });
+
+    // Test cases for the character corruption bug
+    describe('character corruption bug fixes', () => {
+      it('should NOT corrupt file paths with legitimate backslash sequences', () => {
+        // These should remain unchanged - they are legitimate file paths, not escape sequences
+        expect(unescapeStringForGeminiBug('C:\\\\Users\\\\name')).toBe('C:\\\\Users\\\\name');
+        expect(unescapeStringForGeminiBug('path\\\\to\\\\file')).toBe('path\\\\to\\\\file');
+        expect(unescapeStringForGeminiBug('some\\\\normal\\\\path')).toBe('some\\\\normal\\\\path');
+      });
+
+      it('should NOT corrupt text with legitimate backslash + letter combinations', () => {
+        // These are legitimate text, not escape sequences
+        expect(unescapeStringForGeminiBug('setting envDir to the monorepo root')).toBe('setting envDir to the monorepo root');
+        expect(unescapeStringForGeminiBug('import banner from')).toBe('import banner from');
+        expect(unescapeStringForGeminiBug('command === \'serve\' ? \'src\' : \'dist\'')).toBe('command === \'serve\' ? \'src\' : \'dist\'');
+      });
+
+      it('should NOT corrupt Windows-style paths', () => {
+        expect(unescapeStringForGeminiBug('C:\\\\Program Files\\\\Node')).toBe('C:\\\\Program Files\\\\Node');
+        expect(unescapeStringForGeminiBug('D:\\\\workspace\\\\project\\\\src')).toBe('D:\\\\workspace\\\\project\\\\src');
+      });
+
+      it('should still handle actual over-escaped sequences correctly', () => {
+        // These ARE actual escape sequences that should be unescaped
+        expect(unescapeStringForGeminiBug('Hello\\nWorld')).toBe('Hello\nWorld');
+        expect(unescapeStringForGeminiBug('Tab\\tSeparated')).toBe('Tab\tSeparated');
+        expect(unescapeStringForGeminiBug('Quote\\"Text')).toBe('Quote"Text');
+        expect(unescapeStringForGeminiBug('Apostrophe\\\'Text')).toBe('Apostrophe\'Text');
+      });
     });
   });
 
